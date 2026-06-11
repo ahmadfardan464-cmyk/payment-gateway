@@ -1,0 +1,20 @@
+name = "payment-gateway"
+main = "src/worker.js"
+compatibility_date = "2026-06-12"
+
+[vars]
+STRIPE_PUBLISHABLE_KEY = "pk_test_REPLACEME"
+
+[[env.production.vars]]
+STRIPE_PUBLISHABLE_KEY = "pk_live_REPLACEME"
+
+# Secrets (set via wrangler secret put):
+# STRIPE_SECRET_KEY
+# STRIPE_WEBHOOK_SECRET
+# RESEND_API_KEY
+# DOWNLOAD_SECRET
+
+[[kv_namespaces]]
+binding = "SALES_KV"
+id = "REPLACE_WITH_KV_ID"
+preview_id = "REPLACE_WITH_PREVIEW_KV_ID"
