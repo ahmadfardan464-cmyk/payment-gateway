@@ -1,20 +1,16 @@
 name = "payment-gateway"
-main = "src/worker.js"
+main = "src/midtrans-worker.js"
 compatibility_date = "2026-06-12"
 
 [vars]
-STRIPE_PUBLISHABLE_KEY = "pk_test_REPLACEME"
+MIDTRANS_CLIENT_KEY = "SB-Mid…CEME"
+FRONTEND_URL = "https://ahmadfardan464-cmyk.github.io/ai-prompt-pack"
 
 [[env.production.vars]]
-STRIPE_PUBLISHABLE_KEY = "pk_live_REPLACEME"
+MIDTRANS_CLIENT_KEY = "Mid-cl…CEME"
+FRONTEND_URL = "https://ahmadfardan464-cmyk.github.io/ai-prompt-pack"
 
 # Secrets (set via wrangler secret put):
-# STRIPE_SECRET_KEY
-# STRIPE_WEBHOOK_SECRET
+# MIDTRANS_SERVER_KEY
 # RESEND_API_KEY
 # DOWNLOAD_SECRET
-
-[[kv_namespaces]]
-binding = "SALES_KV"
-id = "REPLACE_WITH_KV_ID"
-preview_id = "REPLACE_WITH_PREVIEW_KV_ID"
