@@ -189,7 +189,7 @@ async function sendProductEmail(env, email, orderId) {
         <h2>Terima kasih! 🎉</h2>
         <p>Order ID: <strong>${orderId}</strong></p>
         <p>AI Prompt Engineering Pack siap di-download:</p>
-        <a href="https://storage.fardanista.com/downloads/ai-prompt-pack.zip?token=***"
+        <a href="YOUR_DOWNLOAD_URL_HERE"
            style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
           Download Sekarang
         </a>
