@@ -120,7 +120,9 @@ async function handleMidtransCallback(request, env) {
         }
       } else {
         // Fallback: send email without KV storage
-        await sendProductEmail(env, order_id + '@customer.com', order_id);
+        // Use customer_email from callback body, or default to test email
+        const customerEmail = body.customer_email || 'ahmadfardan464@gmail.com';
+        await sendProductEmail(env, customerEmail, order_id);
       }
     }
     
