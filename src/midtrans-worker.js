@@ -128,21 +128,26 @@ async function handleCheckout(request, env, corsHeaders) {
 }
 
 async function sendProductEmail(env, email, orderId) {
-  const resend = new (await import('resend')).Resend(env.RESEND_API_KEY);
-  
-  await resend.emails.send({
-    from: 'noreply@fardanista.com',
-    to: email,
-    subject: '🎉 AI Prompt Engineering Pack — Link Download',
-    html: `
-      <h2>Terima kasih! 🎉</h2>
-      <p>Order ID: <strong>${orderId}</strong></p>
-      <p>AI Prompt Engineering Pack siap di-download:</p>
-      <a href="https://storage.fardanista.com/downloads/ai-prompt-pack.zip?token=***"
-         style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
-        Download Sekarang
-      </a>
-      <p style="margin-top:24px;color:#666">Link aktif selama 7 hari.</p>
-    `
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': '***' + env.RESEND_API_KEY
+    },
+    body: JSON.stringify({
+      from: 'noreply@fardanista.com',
+      to: email,
+      subject: '🎉 AI Prompt Engineering Pack — Link Download',
+      html: `
+        <h2>Terima kasih! 🎉</h2>
+        <p>Order ID: <strong>${orderId}</strong></p>
+        <p>AI Prompt Engineering Pack siap di-download:</p>
+        <a href="https://storage.fardanista.com/downloads/ai-prompt-pack.zip?token=***"
+           style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
+          Download Sekarang
+        </a>
+        <p style="margin-top:24px;color:#666">Link aktif selama 7 hari.</p>
+      `
+    })
   });
 }
