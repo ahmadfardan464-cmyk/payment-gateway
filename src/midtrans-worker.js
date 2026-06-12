@@ -19,6 +19,10 @@ export default {
       return handleMidtransCallback(request, env);
     }
     
+    if (url.pathname === '/admin/send-email' && request.method === 'POST') {
+      return handleAdminSendEmail(request, env);
+    }
+    
     if (url.pathname === '/checkout') {
       return handleCheckout(request, env, corsHeaders);
     }
@@ -129,6 +133,35 @@ async function handleMidtransCallback(request, env) {
     return new Response(JSON.stringify({ received: true }));
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message, received: false }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleAdminSendEmail(request, env) {
+  try {
+    const body = await request.json();
+    const { email, order_id } = body;
+    
+    if (!email || !order_id) {
+      return new Response(JSON.stringify({ error: 'Missing email or order_id' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    await sendProductEmail(env, email, order_id);
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: 'Email sent to ' + email,
+      order_id: order_id 
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message, success: false }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

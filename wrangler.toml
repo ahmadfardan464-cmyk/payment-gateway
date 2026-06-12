@@ -1,16 +1,8 @@
 name = "payment-gateway"
 main = "src/midtrans-worker.js"
 compatibility_date = "2026-06-12"
+account_id = "0becfc9754d51754f5436cac5c1bfa5b"
 
 [vars]
-MIDTRANS_CLIENT_KEY = "SB-Mid…CEME"
 FRONTEND_URL = "https://ahmadfardan464-cmyk.github.io/ai-prompt-pack"
-
-[[env.production.vars]]
-MIDTRANS_CLIENT_KEY = "Mid-cl…CEME"
-FRONTEND_URL = "https://ahmadfardan464-cmyk.github.io/ai-prompt-pack"
-
-# Secrets (set via wrangler secret put):
-# MIDTRANS_SERVER_KEY
-# RESEND_API_KEY
-# DOWNLOAD_SECRET
+MIDTRANS_CLIENT_KEY = "***"
