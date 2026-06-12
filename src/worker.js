@@ -1,8 +1,8 @@
+// Midtrans Worker — Cloudflare Workers compatible (no npm packages)
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    
-    // CORS headers
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -13,52 +13,70 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
     
-    // Route: POST /checkout — create Stripe session
-    if (url.pathname === '/checkout' && request.method === 'POST') {
-      return handleCheckout(request, env, corsHeaders);
+    if (url.pathname === '/midtrans/charge' && request.method === 'POST') {
+      return handleMidtransCharge(request, env, corsHeaders);
     }
     
-    // Route: POST /webhook — Stripe events
-    if (url.pathname === '/webhook' && request.method === 'POST') {
-      return handleWebhook(request, env);
+    if (url.pathname === '/midtrans/callback' && request.method === 'POST') {
+      return handleMidtransCallback(request, env);
     }
     
     return new Response('Not Found', { status: 404 });
   }
 };
 
-async function handleCheckout(request, env, corsHeaders) {
+async function handleMidtransCharge(request, env, corsHeaders) {
   try {
     const body = await request.json();
-    const { customer_email } = body;
+    const { customer, amount } = body;
     
-    const stripe = require('stripe')(env.STRIPE_SECRET_KEY);
+    const orderId = 'ORDER-' + Date.now();
     
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'AI Prompt Engineering Pack',
-            description: '3000+ premium prompts. Lifetime access.',
-            images: ['https://ahmadfardan464-cmyk.github.io/ai-prompt-pack/assets/cover.png']
-          },
-          unit_amount: 1700 // $17.00
+    // Call Midtrans API directly with fetch
+    const auth = btoa(env.MIDTRANS_SERVER_KEY + ':');
+    
+    const midtransResponse = await fetch('https://app.sandbox.midtrans.com/snap/v1/transactions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Basic ' + auth
+      },
+      body: JSON.stringify({
+        transaction_details: {
+          order_id: orderId,
+          gross_amount: amount
         },
-        quantity: 1
-      }],
-      mode: 'payment',
-      success_url: 'https://ahmadfardan464-cmyk.github.io/ai-prompt-pack/success',
-      cancel_url: 'https://ahmadfardan464-cmyk.github.io/ai-prompt-pack/',
-      customer_email: customer_email || undefined,
-      metadata: {
-        product_id: 'ai-prompt-pack',
-        sku: 'APP-001'
-      }
+        customer_details: {
+          first_name: customer?.first_name || 'Customer',
+          email: customer?.email || 'customer@example.com',
+          phone: customer?.phone || ''
+        },
+        item_details: [{
+          id: 'ai-prompt-pack',
+          price: amount,
+          quantity: 1,
+          name: 'AI Prompt Engineering Pack',
+          brand: 'Fardanista',
+          category: 'Digital Product',
+          merchant_name: 'Fardanista'
+        }],
+        callbacks: {
+          finish: env.FRONTEND_URL + '/success'
+        }
+      })
     });
     
-    return new Response(JSON.stringify({ url: session.url }), {
+    const data = await midtransResponse.json();
+    
+    if (!midtransResponse.ok) {
+      return new Response(JSON.stringify({ error: data.error_messages?.[0] || 'Midtrans error' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    return new Response(JSON.stringify({ token: data.token, redirect_url: data.redirect_url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
     
@@ -70,73 +88,50 @@ async function handleCheckout(request, env, corsHeaders) {
   }
 }
 
-async function handleWebhook(request, env) {
-  const stripe = require('stripe')(env.STRIPE_SECRET_KEY);
-  const sig = request.headers.get('stripe-signature');
-  let event;
+async function handleMidtransCallback(request, env) {
+  const body = await request.json();
+  const { order_id, transaction_status } = body;
   
-  try {
-    const payload = await request.text();
-    event = stripe.webhooks.constructEvent(payload, sig, env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    return new Response(`Webhook Error: ${err.message}`, { status: 400 });
+  if (transaction_status === 'capture' || transaction_status === 'settlement') {
+    // Send email via Resend API directly with fetch
+    await sendEmailViaFetch(env, order_id);
   }
   
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    
-    // Send product email
-    await sendProductEmail(env, session.customer_email, session.id);
-    
-    // Log sale
-    await logSale(env, session);
-  }
-  
-  return new Response(JSON.stringify({ received: true }));
-}
-
-async function sendProductEmail(env, email, orderId) {
-  // Using Resend (free tier, 100/day)
-  const resend = new (await import('resend')).Resend(env.RESEND_API_KEY);
-  
-  await resend.emails.send({
-    from: 'noreply@fardanista.com',
-    to: email,
-    subject: '🎉 Your AI Prompt Engineering Pack is here!',
-    html: `
-      <h2>Thanks for your purchase! 🎉</h2>
-      <p>Order ID: <strong>${orderId}</strong></p>
-      <p>Your AI Prompt Engineering Pack is ready for download:</p>
-      <a href="https://storage.fardanista.com/downloads/ai-prompt-pack.zip?token=${await generateToken(env, orderId)}" 
-         style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
-        Download Now
-      </a>
-      <p style="margin-top:24px;color:#666">Questions? Reply to this email.</p>
-    `
+  return new Response(JSON.stringify({ received: true }), {
+    headers: { 'Content-Type': 'application/json' }
   });
 }
 
-async function logSale(env, session) {
-  // Simple KV logging (replace with proper DB later)
-  const key = `sale:${Date.now()}`;
-  await env.SALES_KV.put(key, JSON.stringify({
-    order_id: session.id,
-    email: session.customer_email,
-    amount: session.amount_total,
-    currency: session.currency,
-    product: session.metadata?.product_id,
-    created_at: new Date().toISOString()
-  }));
-}
-
-async function generateToken(env, orderId) {
-  // Simple HMAC token for download link
-  const encoder = new TextEncoder();
-  const data = encoder.encode(orderId + ':' + Date.now());
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(env.DOWNLOAD_SECRET),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, data);
-  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+async function sendEmailViaFetch(env, orderId) {
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + env.RESEND_API_KEY
+      },
+      body: JSON.stringify({
+        from: 'Fardanista <noreply@fardanista.com>',
+        to: 'ahmadfardan464@gmail.com',
+        subject: '🎉 AI Prompt Engineering Pack — Link Download',
+        html: `
+          <h2>Terima kasih! 🎉</h2>
+          <p>Order ID: <strong>${orderId}</strong></p>
+          <p>AI Prompt Engineering Pack siap di-download:</p>
+          <a href="${env.FRONTEND_URL}/download?order=${orderId}" 
+             style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
+            Download Sekarang
+          </a>
+          <p style="margin-top:24px;color:#666">Link aktif selama 7 hari.</p>
+        `
+      })
+    });
+    
+    if (!response.ok) {
+      console.error('Email failed:', await response.text());
+    }
+    
+  } catch (err) {
+    console.error('Email error:', err.message);
+  }
 }
