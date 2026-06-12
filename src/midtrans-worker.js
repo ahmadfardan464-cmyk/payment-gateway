@@ -97,28 +97,40 @@ async function handleMidtransCharge(request, env, corsHeaders) {
 }
 
 async function handleMidtransCallback(request, env) {
-  const body = await request.json();
-  const { order_id, transaction_status, status_code } = body;
-  
-  if (transaction_status === 'capture' || transaction_status === 'settlement') {
-    // Payment success - send product email
-    const orderData = await env.SALES_KV.get('pending:' + order_id);
-    if (orderData) {
-      const order = JSON.parse(orderData);
-      
-      // Send email via Resend
-      await sendProductEmail(env, order.email || order_id + '@customer.com', order_id);
-      
-      // Update status
-      await env.SALES_KV.put('sale:' + order_id, JSON.stringify({
-        ...order,
-        status: 'paid',
-        paid_at: new Date().toISOString()
-      }));
+  try {
+    const body = await request.json();
+    const { order_id, transaction_status, status_code } = body;
+    
+    if (transaction_status === 'capture' || transaction_status === 'settlement') {
+      // Payment success - send product email
+      if (env.SALES_KV) {
+        const orderData = await env.SALES_KV.get('pending:' + order_id);
+        if (orderData) {
+          const order = JSON.parse(orderData);
+          
+          // Send email via Resend
+          await sendProductEmail(env, order.email || order_id + '@customer.com', order_id);
+          
+          // Update status
+          await env.SALES_KV.put('sale:' + order_id, JSON.stringify({
+            ...order,
+            status: 'paid',
+            paid_at: new Date().toISOString()
+          }));
+        }
+      } else {
+        // Fallback: send email without KV storage
+        await sendProductEmail(env, order_id + '@customer.com', order_id);
+      }
     }
+    
+    return new Response(JSON.stringify({ received: true }));
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message, received: false }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
-  
-  return new Response(JSON.stringify({ received: true }));
 }
 
 async function handleCheckout(request, env, corsHeaders) {
