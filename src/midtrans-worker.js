@@ -132,7 +132,7 @@ async function sendProductEmail(env, email, orderId) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': '***' + env.RESEND_API_KEY
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`
     },
     body: JSON.stringify({
       from: 'noreply@fardanista.com',
