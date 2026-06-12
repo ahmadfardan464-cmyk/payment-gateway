@@ -149,7 +149,7 @@ async function sendProductEmail(env, email, orderId) {
       'Authorization': `Bearer ${env.RESEND_API_KEY}`
     },
     body: JSON.stringify({
-      from: 'noreply@fardanista.com',
+      from: 'onboarding@resend.dev',
       to: email,
       subject: '🎉 AI Prompt Engineering Pack — Link Download',
       html: `
